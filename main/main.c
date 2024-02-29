@@ -9,8 +9,11 @@
 
 #include "rest_server.h"
 #include "wifi_manager.h"
+#include "carroucel.h"
 
 #define TAG "main.c"
+#define POTENTIOMETER_PIN 36
+#define CONTINUOUS_SERVO_PIN 18
 
 static void on_received_new_ip(
     void* arg, 
@@ -39,6 +42,19 @@ void app_main(void)
     };
     start_wifi_manager_task(config, false);
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &on_received_new_ip, NULL));
+
+    int* positions_calibrations_p = malloc(sizeof(int)*8);
+    int positions_calibrations[8] = {2260, 2332, 2390, 2467, 2533, 2607, 2680, 2750};
+
+    memcpy(positions_calibrations_p, positions_calibrations, sizeof(int)*8);
+
+    CarroucelConfig carroucel_config = {
+        .angle_sensor_gpio = 36,
+        .motor_gpio = CONTINUOUS_SERVO_PIN,
+        .nun_of_positions = 8,
+        .positions_calibrations = positions_calibrations
+    };
+    setup_carroucel(carroucel_config);
 
     bool started = false;
     while (1) {

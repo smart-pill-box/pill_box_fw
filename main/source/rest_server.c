@@ -1,6 +1,8 @@
 #include <esp_http_server.h>
 #include <esp_log.h>
 
+#include "carroucel.h"
+
 #define TAG "rest_server.c"
 #define NUN_OF_ENDPOINTS 3
 
@@ -12,6 +14,7 @@ static esp_err_t start_reloading(httpd_req_t *req){
 
 static esp_err_t load_pill(httpd_req_t *req){
     printf("Load pill");
+    carroucel_next_pos();
     httpd_resp_send(req, "Start reloading", HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
 }

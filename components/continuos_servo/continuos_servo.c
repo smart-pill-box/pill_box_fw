@@ -76,6 +76,8 @@ void servo_start(ServoHandler handler){
     ESP_LOGI(TAG, "Enable and start timer");
     ESP_ERROR_CHECK(mcpwm_timer_enable(handler.timer));
     ESP_ERROR_CHECK(mcpwm_timer_start_stop(handler.timer, MCPWM_TIMER_START_NO_STOP));
+
+    servo_break(handler);
 }
 
 void servo_break(ServoHandler handler){
