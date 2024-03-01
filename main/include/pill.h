@@ -1,4 +1,6 @@
+#include "time.h"
+
 typedef struct {
     time_t pill_datetime;
-    char[37] pill_key;
+    char* pill_key;
 } Pill;
