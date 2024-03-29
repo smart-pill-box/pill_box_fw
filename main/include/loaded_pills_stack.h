@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include "pill.h"
 
 /* This works like a buffer that can grow in both directions of the circle
@@ -23,13 +24,23 @@ typedef struct LoadedPillsCircleStack {
     int end;
 } LoadedPillsCircleStack;
 
+void create_pills_stack(int stack_size);
+
+/* Push to the start of the stack, this will be the last popped pill */
 void push_start(Pill pill);
+
+int forward(int pos);
+int backward(int pos);
+
+/* Push to the end of the stack, this will be the next popped pill */
 void push_end(Pill pill);
+
 void pop_start();
 void pop_end();
 Pill get_start_pill();
 Pill get_end_pill();
 int get_start();
 int get_end();
+bool is_empty();
 int get_capacity_left();
 void update_pill_by_key(char* pill_key, time_t new_datetime);

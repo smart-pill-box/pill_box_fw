@@ -84,12 +84,16 @@ int get_capacity_left(){
     return get_distance(_pills_stack.end, _pills_stack.start) - 1;
 }
 
+bool is_empty(){
+    return _pills_stack.end == _pills_stack.start;
+}
+
 Pill get_start_pill(){
     return _pills_stack.pills[_pills_stack.start];
 }
 
 Pill get_end_pill(){
-    return _pills_stack.pills[backward(_pills_stack.end)]
+    return _pills_stack.pills[backward(_pills_stack.end)];
 }
 
 void update_pill_by_key(char* pill_key, time_t new_datetime){

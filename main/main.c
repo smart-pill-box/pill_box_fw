@@ -7,6 +7,8 @@
 #include <esp_wifi.h>
 #include <esp_event.h>
 
+#include "loaded_pills_stack.h"
+#include "pill_box_task.h"
 #include "rest_server.h"
 #include "wifi_manager.h"
 #include "carroucel.h"
@@ -14,6 +16,7 @@
 #define TAG "main.c"
 #define POTENTIOMETER_PIN 36
 #define CONTINUOUS_SERVO_PIN 18
+#define NUN_OF_POSITIONS 20
 
 static void on_received_new_ip(
     void* arg, 
@@ -43,18 +46,21 @@ void app_main(void)
     start_wifi_manager_task(config, false);
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &on_received_new_ip, NULL));
 
-    int* positions_calibrations_p = malloc(sizeof(int)*8);
-    int positions_calibrations[8] = {2260, 2332, 2390, 2467, 2533, 2607, 2680, 2750};
+    int* positions_calibrations_p = malloc(sizeof(int)*NUN_OF_POSITIONS);
+    int init_position = 273;
+    for (int i=0; i < NUN_OF_POSITIONS; i++){
+        *(positions_calibrations_p + i) = init_position + 1800*i;
+    }
 
-    memcpy(positions_calibrations_p, positions_calibrations, sizeof(int)*8);
+    create_pills_stack(NUN_OF_POSITIONS);
 
     CarroucelConfig carroucel_config = {
-        .angle_sensor_gpio = 36,
         .motor_gpio = CONTINUOUS_SERVO_PIN,
-        .nun_of_positions = 8,
-        .positions_calibrations = positions_calibrations
+        .nun_of_positions = NUN_OF_POSITIONS,
+        .positions_calibrations = positions_calibrations_p
     };
     setup_carroucel(carroucel_config);
+    start_pill_box_task();
 
     bool started = false;
     while (1) {

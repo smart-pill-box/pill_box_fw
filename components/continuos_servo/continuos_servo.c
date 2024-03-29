@@ -95,7 +95,7 @@ void servo_run_raw(ServoHandler handler, uint32_t period){
 
 uint32_t speed_percentage_to_period(int speed_percentage, ServoMotorConfig config){
     uint32_t percentage;
-    if(speed_percentage > 0){
+    if(speed_percentage >= 0){
         percentage = (uint32_t) speed_percentage;
         return config.break_period_us + (config.direct_max_period_us - config.break_period_us)*percentage/100;
     } else {

@@ -23,11 +23,50 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/queue.h>
+#include "carroucel.h"
 #include "pill_box_task.h"
+#include "pills_handler.h"
+
+#define ALARM_DURATION_SEC    60*1  // 1 min
+#define ALARM_RETRY_EVERY_SEC 60*10 // 10 mins
+
+// typedef enum ReloadingState {
+//     IDLE,
+//     PREPARING_TO_LOAD,
+//     LOADING,
+// } ReloadingState;
 
 static QueueHandle_t pill_box_queue = NULL;
 PillBoxState _state = IDLE;
+// ReloadingState _reloading_state = IDLE;
 
+void pill_box_task();
+void reloading_state();
+void idle_state();
+void pill_time_state();
+PillBoxEvent get_event();
+void proccess_event(PillBoxEvent event);
+PillBoxTaskMessageResponse idle_proccess_event(PillBoxEvent event);
+PillBoxTaskMessageResponse pill_time_proccess_event(PillBoxEvent event);
+PillBoxTaskMessageResponse reloading_proccess_event(PillBoxEvent event);
+bool is_next_pill_time();
+int time_late_since_next_pill();
+
+bool is_next_pill_time(){
+    // Pill next_pill = get_next_pill();
+
+    // TODO comparar com agora
+
+    return true;
+}
+
+int time_late_since_next_pill(){
+    // Pill next_pill = get_next_pill();
+
+    // TODO comparar com agora
+
+    return 10;
+}
 
 void pill_box_task(){
     while(1){
@@ -50,6 +89,7 @@ void pill_box_task(){
         default:
             break;
         }
+        vTaskDelay(pdMS_TO_TICKS(200));
     }
 }
 
@@ -58,11 +98,78 @@ void reloading_state(){
 }
 
 void idle_state(){
-
+    if(is_next_pill_time()){
+        // send_pill_box_event(PILL_TIME);
+    }
 }
 
 void pill_time_state(){
+    static bool is_playing = false;
+    int time_late = time_late_since_next_pill(); 
+    if(time_late < 0){
+        // TODO stop_buzzer();
+        is_playing = false;
+        send_pill_box_event(CANCELL_PILL_TIME);
+    }
 
+    if(!is_playing && time_late % ALARM_RETRY_EVERY_SEC < ALARM_DURATION_SEC){
+        is_playing = true;
+        // buzzer_play();
+    } else if (is_playing && time_late % ALARM_RETRY_EVERY_SEC > ALARM_DURATION_SEC){
+        is_playing = false;
+        // buzzer_stop();
+    }
+}
+
+PillBoxState get_pill_box_state(){
+    return _state;
+}
+
+void send_pill_box_event(PillBoxEventType event_type){
+    PillBoxEvent event = {
+        .event_type = event_type,
+        .task_handle = NULL,
+    };
+    xQueueSend(pill_box_queue, &event, 0);
+}
+
+PillBoxTaskMessageResponse send_pill_box_event_sync(PillBoxEventType event_type, TaskHandle_t task_handle){
+    PillBoxEvent event = {
+        .event_type = event_type,
+        .task_handle = task_handle,
+    };
+    xQueueSend(pill_box_queue, &event, 0);
+
+    uint32_t notification;
+    if (xTaskNotifyWait(0, 0, &notification, NULL)){
+        return (PillBoxTaskMessageResponse) notification;
+    }
+
+    return TIMEOUT;
+}
+
+PillBoxTaskMessageResponse send_pill_box_message_sync(PillBoxEventType event_type, PillBoxMessage message, TaskHandle_t task_handle){
+    PillBoxEvent event = {
+        .event_type = event_type,
+        .message = message,
+        .task_handle = task_handle,
+    };
+    xQueueSend(pill_box_queue, &event, 0);
+
+    uint32_t notification;
+    if (xTaskNotifyWait(0, 0, &notification, NULL)){
+        return (PillBoxTaskMessageResponse) notification;
+    }
+
+    return TIMEOUT;
+}
+
+void send_pill_box_event_from_isr(PillBoxEventType event_type){
+    PillBoxEvent event = {
+        .event_type = event_type,
+        .task_handle = NULL
+    };
+    xQueueSendFromISR(pill_box_queue, &event, NULL);
 }
 
 PillBoxEvent get_event(){
@@ -71,36 +178,42 @@ PillBoxEvent get_event(){
         return event;
     }
 
-    event = NONE;
+    event.event_type = NONE;
+    event.task_handle = NULL;
 
     return event;
 }
 
 void proccess_event(PillBoxEvent event){
+    PillBoxTaskMessageResponse response = FAILED;
+
     switch (_state)
     {
     case IDLE:
-        idle_proccess_event(event);
+        response = idle_proccess_event(event);
         break;
 
     case PILL_TIME:
-        pill_time_proccess_event(event);
+        response = pill_time_proccess_event(event);
         break;
 
     case RELOADING:
-        reloading_proccess_event(event);
+        response = reloading_proccess_event(event);
         break;
     
     default:
         break;
     }
+
+    if(event.task_handle != NULL){
+        xTaskNotify(event.task_handle, response, eSetValueWithOverwrite);
+    }
 }
 
-void idle_proccess_event(PillBoxEvent event){
-    switch (event)
+PillBoxTaskMessageResponse idle_proccess_event(PillBoxEvent event){
+    switch (event.event_type)
     {
-    case PILL_TIME:
-        // Start buzzer
+    case PILL_TIME_EVENT:
         _state = PILL_TIME;
         break;
 
@@ -110,6 +223,10 @@ void idle_proccess_event(PillBoxEvent event){
     
     case START_RELOAD:
         _state = RELOADING;
+        printf("Going to state RELOADING\n");
+        // _reloading_state = IDLE;
+        // carroucel_to_pos_ccw(backward(get_start()));
+        // Carroucel to position 
         break;
 
     case FINISH_RELOAD:
@@ -117,18 +234,19 @@ void idle_proccess_event(PillBoxEvent event){
         break;
 
     case LOAD_PILL:
-        // Erro
         break;
     
     default:
         break;
     }
+
+    return SUCCESS;
 }
 
-void pill_time_proccess_event(PillBoxEvent event){
-    switch (event)
+PillBoxTaskMessageResponse pill_time_proccess_event(PillBoxEvent event){
+    switch (event.event_type)
     {
-    case PILL_TIME:
+    case PILL_TIME_EVENT:
         // Já chegou a hora do próximo, o que fazer ?
         break;
 
@@ -151,12 +269,14 @@ void pill_time_proccess_event(PillBoxEvent event){
     default:
         break;
     }
+
+    return SUCCESS;
 }
 
-void reloading_proccess_event(PillBoxEvent event){
-    switch (event)
+PillBoxTaskMessageResponse reloading_proccess_event(PillBoxEvent event){
+    switch (event.event_type)
     {
-    case PILL_TIME:
+    case PILL_TIME_EVENT:
         /* code */
         break;
 
@@ -165,25 +285,35 @@ void reloading_proccess_event(PillBoxEvent event){
         break;
     
     case START_RELOAD:
-        /* code */
+        return FAILED;
         break;
 
     case FINISH_RELOAD:
-        /* code */
+        _state = IDLE;
+        break;
+
+    case WILL_LOAD_PILL:
+        WillLoadPillMessage message = event.message.will_load_pill_message;
+        if(!prepare_to_load_pill(message.pill_to_load)){
+            return FAILED;
+        }
         break;
 
     case LOAD_PILL:
-        /* code */
+        if(!load_pill()){
+            return FAILED;
+        }
         break;
     
     default:
         break;
     }
+
+    return SUCCESS;
 }
 
-
 void start_pill_box_task(){
-    pill_box_queue = xQueueCreate(64, sizeof PillBoxEvent);
+    pill_box_queue = xQueueCreate(64, sizeof(PillBoxEvent));
 
     xTaskCreate(pill_box_task, "pill_box_task", 2048, NULL, 1, NULL);
 }
