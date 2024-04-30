@@ -1,4 +1,5 @@
 
+#include "protocomm.h"
 typedef struct wifi_manager_config_t
 {
     const char * device_prefix;
@@ -10,3 +11,5 @@ typedef struct wifi_manager_config_t
 void start_wifi_manager_task(wifi_manager_config_t config, bool restart_nvm_wifi_config);
 
 bool get_connection_status();
+
+void add_custom_endpoint(char * endpoint_name, protocomm_req_handler_t handler);

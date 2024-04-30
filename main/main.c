@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <inttypes.h>
 #include <nvs_flash.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -7,11 +8,14 @@
 #include <esp_wifi.h>
 #include <esp_event.h>
 
+#include "esp_netif_ip_addr.h"
 #include "loaded_pills_stack.h"
+#include "constants.h"
 #include "pill_box_task.h"
 #include "rest_server.h"
 #include "wifi_manager.h"
 #include "carroucel.h"
+#include "api_client.h"
 
 #define TAG "main.c"
 #define POTENTIOMETER_PIN 36
@@ -26,6 +30,26 @@ static void on_received_new_ip(
 ){
     ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
     ESP_LOGI(TAG, "Connected with IP Address:" IPSTR, IP2STR(&event->ip_info.ip));
+	char device_ip[26];
+	sprintf(device_ip, IPSTR, IP2STR(&event->ip_info.ip));
+	post_device_ip(device_ip);
+}
+
+esp_err_t device_key_provision_endpoint_handler(uint32_t session_id, const uint8_t *inbuf, ssize_t inlen,
+                                          uint8_t **outbuf, ssize_t *outlen, void *priv_data)
+{
+    if (inbuf) {
+        ESP_LOGI(TAG, "Received data: %.*s", inlen, (char *)inbuf);
+    }
+    char response[] = DEVICE_KEY;
+    *outbuf = (uint8_t *)strdup(response);
+    if (*outbuf == NULL) {
+        ESP_LOGE(TAG, "System out of memory");
+        return ESP_ERR_NO_MEM;
+    }
+    *outlen = strlen(response) + 1; /* +1 for NULL terminating byte */
+
+    return ESP_OK;
 }
 
 void app_main(void)
@@ -43,6 +67,7 @@ void app_main(void)
         .proof_of_possession = "pop",
         .service_name = "MY_BOX"
     };
+	add_custom_endpoint("get_device_key", device_key_provision_endpoint_handler);
     start_wifi_manager_task(config, false);
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &on_received_new_ip, NULL));
 
@@ -53,14 +78,15 @@ void app_main(void)
     }
 
     create_pills_stack(NUN_OF_POSITIONS);
+	init_api_client_task();
 
-    CarroucelConfig carroucel_config = {
-        .motor_gpio = CONTINUOUS_SERVO_PIN,
-        .nun_of_positions = NUN_OF_POSITIONS,
-        .positions_calibrations = positions_calibrations_p
-    };
-    setup_carroucel(carroucel_config);
-    start_pill_box_task();
+	// CarroucelConfig carroucel_config = {
+    //     .motor_gpio = CONTINUOUS_SERVO_PIN,
+    //     .nun_of_positions = NUN_OF_POSITIONS,
+    //     .positions_calibrations = positions_calibrations_p
+    // };
+    // setup_carroucel(carroucel_config);
+    // start_pill_box_task();
 
     bool started = false;
     while (1) {

@@ -29,6 +29,10 @@ static wifi_manager_t wifi_manager;
 
 const char * TAG = "wifi_manager";
 
+bool is_to_create_custom_endpoint = false;
+char * custom_endpoint_name = NULL;
+protocomm_req_handler_t custom_endpoint_handler = NULL;
+
 /* Event handler for catching system events */
 static void event_handler(void* arg, esp_event_base_t event_base,
                           int32_t event_id, void* event_data)
@@ -106,21 +110,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
             default:
                 break;
         }
-    } else if (event_base == PROTOCOMM_SECURITY_SESSION_EVENT) {
-        switch (event_id) {
-            case PROTOCOMM_SECURITY_SESSION_SETUP_OK:
-                ESP_LOGI(TAG, "Secured session established!");
-                break;
-            case PROTOCOMM_SECURITY_SESSION_INVALID_SECURITY_PARAMS:
-                ESP_LOGE(TAG, "Received invalid security parameters for establishing secure session!");
-                break;
-            case PROTOCOMM_SECURITY_SESSION_CREDENTIALS_MISMATCH:
-                ESP_LOGE(TAG, "Received incorrect username and/or PoP for establishing secure session!");
-                break;
-            default:
-                break;
-        }
-    }
+    } 
 }
 
 static void start_provisioning(){
@@ -141,6 +131,9 @@ static void start_provisioning(){
     ESP_ERROR_CHECK(wifi_prov_scheme_ble_set_service_uuid(custom_service_uuid));
 
     ESP_ERROR_CHECK(wifi_prov_mgr_start_provisioning(security, (const void *) sec_params, wifi_manager.config.service_name, NULL));
+		if(is_to_create_custom_endpoint){
+				ESP_ERROR_CHECK(wifi_prov_mgr_endpoint_register(custom_endpoint_name, custom_endpoint_handler, NULL));
+		}
 }
 
 static EventBits_t wait_wifi_connection_or_disconnection(void){
@@ -223,6 +216,9 @@ static void wifi_manager_task(){
                     esp_wifi_get_config(WIFI_IF_STA, &wifi_cfg_old);
 
                     ESP_ERROR_CHECK(wifi_prov_mgr_init(prov_config));
+										if(is_to_create_custom_endpoint){
+											ESP_ERROR_CHECK(wifi_prov_mgr_endpoint_create(custom_endpoint_name));
+										}
                     start_provisioning();
 
                     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
@@ -236,6 +232,9 @@ static void wifi_manager_task(){
         } else {
             printf("I'm not provisioned\n");
             ESP_ERROR_CHECK(wifi_prov_mgr_init(prov_config));
+			if(is_to_create_custom_endpoint){
+				ESP_ERROR_CHECK(wifi_prov_mgr_endpoint_create(custom_endpoint_name));
+			}
             start_provisioning();
 
             printf("Waiting connection...\n");
@@ -260,6 +259,13 @@ static void wifi_manager_task(){
     }
 }
 
+void add_custom_endpoint(char * endpoint_name, protocomm_req_handler_t handler){
+	custom_endpoint_name = endpoint_name;
+	custom_endpoint_handler = handler;
+
+	is_to_create_custom_endpoint = true;
+}
+
 void start_wifi_manager_task(wifi_manager_config_t config, bool restart_nvm_wifi_config){
     wifi_manager.config = config;
     wifi_manager.is_connected = false;
@@ -275,7 +281,6 @@ void start_wifi_manager_task(wifi_manager_config_t config, bool restart_nvm_wifi
     /* Register our event handler for Wi-Fi, IP and Provisioning related events */
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_PROV_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
     ESP_ERROR_CHECK(esp_event_handler_register(PROTOCOMM_TRANSPORT_BLE_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_register(PROTOCOMM_SECURITY_SESSION_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL));
 
