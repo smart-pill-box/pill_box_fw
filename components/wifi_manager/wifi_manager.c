@@ -16,6 +16,7 @@
 
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_DISCONNECTED_BIT BIT1
+#define DEVICE_KEY "my_device_key"
 
 static EventGroupHandle_t wifi_event_group;
 
@@ -130,10 +131,16 @@ static void start_provisioning(){
 
     ESP_ERROR_CHECK(wifi_prov_scheme_ble_set_service_uuid(custom_service_uuid));
 
-    ESP_ERROR_CHECK(wifi_prov_mgr_start_provisioning(security, (const void *) sec_params, wifi_manager.config.service_name, NULL));
-		if(is_to_create_custom_endpoint){
-				ESP_ERROR_CHECK(wifi_prov_mgr_endpoint_register(custom_endpoint_name, custom_endpoint_handler, NULL));
-		}
+    if (is_to_create_custom_endpoint) {
+      ESP_ERROR_CHECK(wifi_prov_mgr_endpoint_create(custom_endpoint_name));
+    }
+    ESP_ERROR_CHECK(wifi_prov_mgr_start_provisioning(
+        security, (const void *)sec_params, wifi_manager.config.service_name,
+        NULL));
+    if (is_to_create_custom_endpoint) {
+      ESP_ERROR_CHECK(wifi_prov_mgr_endpoint_register(
+          custom_endpoint_name, custom_endpoint_handler, NULL));
+    }
 }
 
 static EventBits_t wait_wifi_connection_or_disconnection(void){
@@ -216,9 +223,6 @@ static void wifi_manager_task(){
                     esp_wifi_get_config(WIFI_IF_STA, &wifi_cfg_old);
 
                     ESP_ERROR_CHECK(wifi_prov_mgr_init(prov_config));
-										if(is_to_create_custom_endpoint){
-											ESP_ERROR_CHECK(wifi_prov_mgr_endpoint_create(custom_endpoint_name));
-										}
                     start_provisioning();
 
                     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
@@ -232,9 +236,6 @@ static void wifi_manager_task(){
         } else {
             printf("I'm not provisioned\n");
             ESP_ERROR_CHECK(wifi_prov_mgr_init(prov_config));
-			if(is_to_create_custom_endpoint){
-				ESP_ERROR_CHECK(wifi_prov_mgr_endpoint_create(custom_endpoint_name));
-			}
             start_provisioning();
 
             printf("Waiting connection...\n");
@@ -300,3 +301,4 @@ void start_wifi_manager_task(wifi_manager_config_t config, bool restart_nvm_wifi
 bool get_connection_status(){
     return wifi_manager.is_connected;
 }
+

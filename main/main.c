@@ -16,6 +16,7 @@
 #include "wifi_manager.h"
 #include "carroucel.h"
 #include "api_client.h"
+#include "constants.h"
 
 #define TAG "main.c"
 #define POTENTIOMETER_PIN 36
@@ -32,12 +33,13 @@ static void on_received_new_ip(
     ESP_LOGI(TAG, "Connected with IP Address:" IPSTR, IP2STR(&event->ip_info.ip));
 	char device_ip[26];
 	sprintf(device_ip, IPSTR, IP2STR(&event->ip_info.ip));
-	post_device_ip(device_ip);
+	put_device_ip(device_ip);
 }
 
-esp_err_t device_key_provision_endpoint_handler(uint32_t session_id, const uint8_t *inbuf, ssize_t inlen,
+esp_err_t test_handler(uint32_t session_id, const uint8_t *inbuf, ssize_t inlen,
                                           uint8_t **outbuf, ssize_t *outlen, void *priv_data)
 {
+	printf("OMG I RECEIVED A REQUEST IN MY CUSTOM ENDPOINT");
     if (inbuf) {
         ESP_LOGI(TAG, "Received data: %.*s", inlen, (char *)inbuf);
     }
@@ -67,8 +69,8 @@ void app_main(void)
         .proof_of_possession = "pop",
         .service_name = "MY_BOX"
     };
-	add_custom_endpoint("get_device_key", device_key_provision_endpoint_handler);
-    start_wifi_manager_task(config, false);
+	add_custom_endpoint("custom-data", test_handler);
+    start_wifi_manager_task(config, true);
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &on_received_new_ip, NULL));
 
     int* positions_calibrations_p = malloc(sizeof(int)*NUN_OF_POSITIONS);
@@ -80,17 +82,17 @@ void app_main(void)
     create_pills_stack(NUN_OF_POSITIONS);
 	init_api_client_task();
 
-	// CarroucelConfig carroucel_config = {
-    //     .motor_gpio = CONTINUOUS_SERVO_PIN,
-    //     .nun_of_positions = NUN_OF_POSITIONS,
-    //     .positions_calibrations = positions_calibrations_p
-    // };
-    // setup_carroucel(carroucel_config);
-    // start_pill_box_task();
+	CarroucelConfig carroucel_config = {
+        .motor_gpio = CONTINUOUS_SERVO_PIN,
+        .nun_of_positions = NUN_OF_POSITIONS,
+        .positions_calibrations = positions_calibrations_p
+    };
+    setup_carroucel(carroucel_config);
+    start_pill_box_task();
 
     bool started = false;
     while (1) {
-        printf("Connection status is %d \n", get_connection_status());
+        // printf("Connection status is %d \n", get_connection_status());
         vTaskDelay(1000 / portTICK_PERIOD_MS);
         if(get_connection_status() == 1 && !started){
             started = true;

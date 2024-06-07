@@ -1,1 +1,1 @@
-#define DEVICE_KEY "abasd-1234-ad-asd-asd123-asd"
+#define DEVICE_KEY "abcd-efgh-ijklm-nopqrst-uvwxyz123-45"

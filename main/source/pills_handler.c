@@ -1,6 +1,7 @@
 #include "pills_handler.h"
 #include "loaded_pills_stack.h"
 #include "carroucel.h"
+#include "api_client.h"
 
 Pill pill_to_load;
 int wanted_position;
@@ -45,10 +46,13 @@ bool load_pill(){
     if(pushed_to_end){
         carroucel_to_pos_ccw(forward(get_end()));
         push_end(pill_to_load);
+		post_device_pill(get_end(), &pill_to_load);
     } else {
         carroucel_to_pos_acw(backward(backward(get_start())));
         push_start(pill_to_load);
+		post_device_pill(get_start(), &pill_to_load);
     }
+	free(pill_to_load.pill_key);
 
     return true;
 }

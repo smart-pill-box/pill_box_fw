@@ -23,9 +23,11 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/queue.h>
+#include <string.h>
 #include "carroucel.h"
 #include "pill_box_task.h"
 #include "pills_handler.h"
+#include "xtensa/corebits.h"
 
 #define ALARM_DURATION_SEC    60*1  // 1 min
 #define ALARM_RETRY_EVERY_SEC 60*10 // 10 mins
@@ -149,6 +151,13 @@ PillBoxTaskMessageResponse send_pill_box_event_sync(PillBoxEventType event_type,
 }
 
 PillBoxTaskMessageResponse send_pill_box_message_sync(PillBoxEventType event_type, PillBoxMessage message, TaskHandle_t task_handle){
+
+	if(event_type == WILL_LOAD_PILL) {
+		char * pill_key = malloc(sizeof(char) * 37);
+		memcpy(pill_key, message.will_load_pill_message.pill_to_load.pill_key, sizeof(char) * 37);
+		message.will_load_pill_message.pill_to_load.pill_key = pill_key;
+	}
+
     PillBoxEvent event = {
         .event_type = event_type,
         .message = message,
@@ -294,6 +303,7 @@ PillBoxTaskMessageResponse reloading_proccess_event(PillBoxEvent event){
 
     case WILL_LOAD_PILL:
         WillLoadPillMessage message = event.message.will_load_pill_message;
+		printf("\nHERE: %s\n", message.pill_to_load.pill_key);
         if(!prepare_to_load_pill(message.pill_to_load)){
             return FAILED;
         }

@@ -7,4 +7,6 @@ import time
 #     "pill_datetime": "2024-03-29T04:00:00.000Z"
 # })
 # print(response.text)
-response = requests.post("http://192.168.0.19/load_pill")
+response = requests.post("http://192.168.0.29/load_pill")
+
+print(response.text)

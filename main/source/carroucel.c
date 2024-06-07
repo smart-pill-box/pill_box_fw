@@ -12,7 +12,7 @@
 #define MAX_ERROR 18000
 #define ANY_DIRECTION_ERROR 900
 
-#define MIN_VELOCITY 15
+#define MIN_VELOCITY 30
 #define MAX_VELOCITY 80
 
 Carroucel _carroucel;

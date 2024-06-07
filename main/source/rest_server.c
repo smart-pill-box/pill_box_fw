@@ -7,10 +7,11 @@
 
 #include "cJSON.h"
 #include "carroucel.h"
+#include "esp_err.h"
 #include "pill_box_task.h"
 
 #define TAG "rest_server.c"
-#define NUN_OF_ENDPOINTS 4
+#define NUN_OF_ENDPOINTS 5
 
 #define MAX_POST_SIZE 1024
 
@@ -56,7 +57,7 @@ char * parse_string_or_fail(httpd_req_t *req, cJSON* root, char* item_str){
 }
 
 static esp_err_t start_reloading(httpd_req_t *req){
-    printf("Start reloading");
+	ESP_LOGI(TAG, "\nRECEIVED_REQUEST: start_reloading");
     PillBoxTaskMessageResponse response = send_pill_box_event_sync(START_RELOAD, xTaskGetCurrentTaskHandle());
     if(response == SUCCESS){
         httpd_resp_send(req, "Success", HTTPD_RESP_USE_STRLEN);
@@ -71,6 +72,7 @@ static esp_err_t start_reloading(httpd_req_t *req){
 }
 
 static esp_err_t will_load_pill(httpd_req_t *req){
+	ESP_LOGI(TAG, "\n RECEIVED_REQUEST: will_load_pill");
     char buf[MAX_POST_SIZE];
     cJSON* root = parse_json_or_fail(buf, MAX_POST_SIZE, req);
 
@@ -81,10 +83,10 @@ static esp_err_t will_load_pill(httpd_req_t *req){
 
     struct tm tm;
 
+	ESP_LOGD(TAG, "Will parse time %s", pill_datetime);
     memset(&tm, 0, sizeof(struct tm));
-    printf("%s\n", pill_datetime);
     strptime(pill_datetime, "%Y-%m-%dT%H:%M:%SZ", &tm);
-    printf("%d-%d-%d %d:%d:%d", tm.tm_year, tm.tm_mon, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+	ESP_LOGD(TAG, "\n WILL_LOAD_PILL: pill_key is %s", pill_key);
 
     WillLoadPillMessage message = {
         .pill_to_load = {
@@ -93,7 +95,7 @@ static esp_err_t will_load_pill(httpd_req_t *req){
         },
     };
     PillBoxTaskMessageResponse response = send_pill_box_message_sync(WILL_LOAD_PILL, (PillBoxMessage) message, xTaskGetCurrentTaskHandle());
-    if(response == SUCCESS){
+	if(response == SUCCESS){
         httpd_resp_send(req, "Success", HTTPD_RESP_USE_STRLEN);
     } else if (response == TIMEOUT){
         httpd_resp_send(req, "Timeout", HTTPD_RESP_USE_STRLEN);
@@ -108,7 +110,7 @@ static esp_err_t will_load_pill(httpd_req_t *req){
 }
 
 static esp_err_t load_pill(httpd_req_t *req){
-    printf("Load pill");
+	ESP_LOGI(TAG, "\nRECEIVED_REQUEST: load_pill");
     PillBoxTaskMessageResponse response = send_pill_box_event_sync(LOAD_PILL, xTaskGetCurrentTaskHandle());
     if(response == SUCCESS){
         httpd_resp_send(req, "Success", HTTPD_RESP_USE_STRLEN);
@@ -124,9 +126,14 @@ static esp_err_t load_pill(httpd_req_t *req){
 }
 
 static esp_err_t finish_reloading(httpd_req_t *req){
-    printf("Finish reloading");
+	ESP_LOGI(TAG, "\nRECEIVED_REQUEST: finish_reloading");
     httpd_resp_send(req, "Finish reloading", HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
+}
+
+static esp_err_t test_connection(httpd_req_t *req){
+	httpd_resp_send(req, "Ok", HTTPD_RESP_USE_STRLEN);
+	return ESP_OK;
 }
 
 static const httpd_uri_t endpoints[NUN_OF_ENDPOINTS] = {
@@ -134,6 +141,7 @@ static const httpd_uri_t endpoints[NUN_OF_ENDPOINTS] = {
     {.uri = "/finish_reloading", .method = HTTP_POST, .handler = finish_reloading},
     {.uri = "/load_pill", .method = HTTP_POST, .handler = load_pill},
     {.uri = "/will_load_pill", .method = HTTP_POST, .handler = will_load_pill},
+	{.uri = "/test_connection", .method = HTTP_GET, .handler = test_connection},
 };
 
 void start_webserver(){
