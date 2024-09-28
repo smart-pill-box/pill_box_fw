@@ -11,7 +11,7 @@
 #include "pill_box_task.h"
 
 #define TAG "rest_server.c"
-#define NUN_OF_ENDPOINTS 5
+#define NUN_OF_ENDPOINTS 7
 
 #define MAX_POST_SIZE 1024
 
@@ -26,9 +26,7 @@ cJSON* parse_json_or_fail(char * buffer, int buff_size, httpd_req_t * req){
         /* Respond with 500 Internal Server Error */
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "content too long");
     }
-    printf("enter wfile\n");
     while (cur_len < total_len) {
-        printf("looping\n");
         received = httpd_req_recv(req, buffer + cur_len, total_len);
         if (received <= 0) {
             /* Respond with 500 Internal Server Error */
@@ -71,6 +69,44 @@ static esp_err_t start_reloading(httpd_req_t *req){
     return ESP_OK;
 }
 
+static esp_err_t take_pill(httpd_req_t *req){
+	ESP_LOGI(TAG, "\nRECEIVED_REQUEST: take_pill");
+    PillBoxTaskMessageResponse response = send_pill_box_event_sync(TOOK_PILL, xTaskGetCurrentTaskHandle());
+    if(response == SUCCESS){
+        httpd_resp_send(req, "Success", HTTPD_RESP_USE_STRLEN);
+    } else if (response == TIMEOUT){
+        httpd_resp_send(req, "Erro interno", HTTPD_RESP_USE_STRLEN);
+    } else if (response == FAILED) {
+        httpd_resp_send(req, "Impossivel recarregar agora", HTTPD_RESP_USE_STRLEN);
+    } else {
+        httpd_resp_send(req, "I don't know", HTTPD_RESP_USE_STRLEN);
+    }
+    return ESP_OK;
+}
+
+static esp_err_t get_status(httpd_req_t *req){
+	ESP_LOGI(TAG, "\nRECEIVED REQUEST: get_status");
+
+	PillBoxState state = get_pill_box_state();
+
+	char state_str[50];
+	switch (state) {
+		case IDLE:
+			sprintf(state_str, "idle");
+		case PILL_TIME:
+			sprintf(state_str, "pill_time");
+		case RELOADING:
+			sprintf(state_str, "reloading");
+		default:
+			httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Internal Error");
+	}
+
+	char response_str[100];
+	sprintf(response_str, "{'state': %s}", state_str);
+	httpd_resp_send(req, response_str, HTTPD_RESP_USE_STRLEN);
+    return ESP_OK;
+}
+
 static esp_err_t will_load_pill(httpd_req_t *req){
 	ESP_LOGI(TAG, "\n RECEIVED_REQUEST: will_load_pill");
     char buf[MAX_POST_SIZE];
@@ -79,14 +115,9 @@ static esp_err_t will_load_pill(httpd_req_t *req){
     char* pill_key = parse_string_or_fail(req, root, "pill_key");
     char* pill_datetime = parse_string_or_fail(req, root, "pill_datetime");
 
-    httpd_resp_sendstr(req, "Post control value successfully");
-
     struct tm tm;
-
-	ESP_LOGD(TAG, "Will parse time %s", pill_datetime);
     memset(&tm, 0, sizeof(struct tm));
     strptime(pill_datetime, "%Y-%m-%dT%H:%M:%SZ", &tm);
-	ESP_LOGD(TAG, "\n WILL_LOAD_PILL: pill_key is %s", pill_key);
 
     WillLoadPillMessage message = {
         .pill_to_load = {
@@ -142,6 +173,8 @@ static const httpd_uri_t endpoints[NUN_OF_ENDPOINTS] = {
     {.uri = "/load_pill", .method = HTTP_POST, .handler = load_pill},
     {.uri = "/will_load_pill", .method = HTTP_POST, .handler = will_load_pill},
 	{.uri = "/test_connection", .method = HTTP_GET, .handler = test_connection},
+	{.uri = "/status", .method = HTTP_GET, .handler = get_status},
+	{.uri = "/take_pill", .method = HTTP_POST, .handler = take_pill},
 };
 
 void start_webserver(){

@@ -9,7 +9,9 @@
 #include <esp_event.h>
 
 #include "esp_netif_ip_addr.h"
+#include "freertos/portmacro.h"
 #include "loaded_pills_stack.h"
+#include "alarm.h"
 #include "constants.h"
 #include "pill_box_task.h"
 #include "rest_server.h"
@@ -39,7 +41,6 @@ static void on_received_new_ip(
 esp_err_t test_handler(uint32_t session_id, const uint8_t *inbuf, ssize_t inlen,
                                           uint8_t **outbuf, ssize_t *outlen, void *priv_data)
 {
-	printf("OMG I RECEIVED A REQUEST IN MY CUSTOM ENDPOINT");
     if (inbuf) {
         ESP_LOGI(TAG, "Received data: %.*s", inlen, (char *)inbuf);
     }
@@ -70,7 +71,7 @@ void app_main(void)
         .service_name = "MY_BOX"
     };
 	add_custom_endpoint("custom-data", test_handler);
-    start_wifi_manager_task(config, true);
+    start_wifi_manager_task(config, false);
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &on_received_new_ip, NULL));
 
     int* positions_calibrations_p = malloc(sizeof(int)*NUN_OF_POSITIONS);
@@ -88,16 +89,18 @@ void app_main(void)
         .positions_calibrations = positions_calibrations_p
     };
     setup_carroucel(carroucel_config);
+	alarm_init(23);
     start_pill_box_task();
+
 
     bool started = false;
     while (1) {
-        // printf("Connection status is %d \n", get_connection_status());
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
         if(get_connection_status() == 1 && !started){
             started = true;
             start_webserver();
         }
+		printf("End: %d \n Start: %d \n", get_end(), get_start());
+		vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 
 }

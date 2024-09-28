@@ -22,15 +22,20 @@
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <esp_log.h>
 #include <freertos/queue.h>
 #include <string.h>
+#include <time.h>
+#include "alarm.h"
 #include "carroucel.h"
 #include "pill_box_task.h"
 #include "pills_handler.h"
 #include "xtensa/corebits.h"
 
-#define ALARM_DURATION_SEC    60*1  // 1 min
-#define ALARM_RETRY_EVERY_SEC 60*10 // 10 mins
+#define ALARM_DURATION_SEC    60  // 1 min
+#define ALARM_RETRY_EVERY_SEC 600 // 60 * 10 = 10 mins
+#define RELOADING_STATE_TIMEOUT_SEC 20
+#define TAG "pill_box_task"
 
 // typedef enum ReloadingState {
 //     IDLE,
@@ -40,7 +45,7 @@
 
 static QueueHandle_t pill_box_queue = NULL;
 PillBoxState _state = IDLE;
-// ReloadingState _reloading_state = IDLE;
+time_t last_reloading_state_event;
 
 void pill_box_task();
 void reloading_state();
@@ -53,21 +58,36 @@ PillBoxTaskMessageResponse pill_time_proccess_event(PillBoxEvent event);
 PillBoxTaskMessageResponse reloading_proccess_event(PillBoxEvent event);
 bool is_next_pill_time();
 int time_late_since_next_pill();
+void goto_state(PillBoxState state);
+ 
+void goto_state(PillBoxState state){
+	ESP_LOGI(TAG, "Going from state %d, to state %d", _state, state);
+	if(state == RELOADING){
+		time(&last_reloading_state_event);
+		last_reloading_state_event = time(NULL);
+	}
+
+	_state = state;
+}
 
 bool is_next_pill_time(){
-    // Pill next_pill = get_next_pill();
+	if(!have_pill_available()){
+		return false;
+	}
+    Pill next_pill = get_next_pill();
 
-    // TODO comparar com agora
-
-    return true;
+	return time(NULL) >= next_pill.pill_datetime;
 }
 
 int time_late_since_next_pill(){
-    // Pill next_pill = get_next_pill();
+	if(!have_pill_available()){
+		return -1;
+	}
+	Pill next_pill = get_next_pill();
 
-    // TODO comparar com agora
+	time_t now = time(NULL);
 
-    return 10;
+    return now - next_pill.pill_datetime;
 }
 
 void pill_box_task(){
@@ -96,12 +116,21 @@ void pill_box_task(){
 }
 
 void reloading_state(){
-
+	time_t now;
+	time(&now);
+	printf("\n\n now: %lld", now);
+	printf("\n last_reloading_state_event: %lld", last_reloading_state_event);
+	printf("\n %lld", now - last_reloading_state_event);
+	if(now - last_reloading_state_event >= RELOADING_STATE_TIMEOUT_SEC){
+		ESP_LOGI(TAG, "RELOADING TIMEOUT, returning to IDLE");
+		goto_state(IDLE);	
+	}
 }
 
 void idle_state(){
     if(is_next_pill_time()){
-        // send_pill_box_event(PILL_TIME);
+		ESP_LOGI(TAG, "Is next pill time, sending pill_time event");
+        send_pill_box_event(PILL_TIME_EVENT);
     }
 }
 
@@ -109,17 +138,20 @@ void pill_time_state(){
     static bool is_playing = false;
     int time_late = time_late_since_next_pill(); 
     if(time_late < 0){
-        // TODO stop_buzzer();
+        alarm_pause();
         is_playing = false;
-        send_pill_box_event(CANCELL_PILL_TIME);
+		goto_state(IDLE);
+		return;
     }
 
-    if(!is_playing && time_late % ALARM_RETRY_EVERY_SEC < ALARM_DURATION_SEC){
+	printf("\n Time late %d, after proccess: %d\n", time_late, (time_late % ALARM_RETRY_EVERY_SEC));
+    if(!is_playing && ((time_late % ALARM_RETRY_EVERY_SEC) < ALARM_DURATION_SEC)){
         is_playing = true;
-        // buzzer_play();
-    } else if (is_playing && time_late % ALARM_RETRY_EVERY_SEC > ALARM_DURATION_SEC){
+		printf("\n\n\n\n\n RING ALARM \n\n\n\n\n");
+        alarm_ring();
+    } else if (is_playing && ((time_late % ALARM_RETRY_EVERY_SEC) > ALARM_DURATION_SEC)){
         is_playing = false;
-        // buzzer_stop();
+        alarm_pause();
     }
 }
 
@@ -223,19 +255,15 @@ PillBoxTaskMessageResponse idle_proccess_event(PillBoxEvent event){
     switch (event.event_type)
     {
     case PILL_TIME_EVENT:
-        _state = PILL_TIME;
+		goto_state(PILL_TIME);
         break;
 
     case TOOK_PILL:
-        // Conferir se ele pode tomar agora o remédio
         break;
     
     case START_RELOAD:
-        _state = RELOADING;
+		goto_state(RELOADING);
         printf("Going to state RELOADING\n");
-        // _reloading_state = IDLE;
-        // carroucel_to_pos_ccw(backward(get_start()));
-        // Carroucel to position 
         break;
 
     case FINISH_RELOAD:
@@ -260,7 +288,8 @@ PillBoxTaskMessageResponse pill_time_proccess_event(PillBoxEvent event){
         break;
 
     case TOOK_PILL:
-        _state = IDLE;
+		printf("\n\n RECEIVED TOOK PILL EVENT\n\n");
+		take_next_pill();
         break;
     
     case START_RELOAD:
@@ -283,6 +312,11 @@ PillBoxTaskMessageResponse pill_time_proccess_event(PillBoxEvent event){
 }
 
 PillBoxTaskMessageResponse reloading_proccess_event(PillBoxEvent event){
+
+	if(event.event_type != NONE){
+		last_reloading_state_event = time(NULL);
+	}
+
     switch (event.event_type)
     {
     case PILL_TIME_EVENT:
@@ -298,12 +332,11 @@ PillBoxTaskMessageResponse reloading_proccess_event(PillBoxEvent event){
         break;
 
     case FINISH_RELOAD:
-        _state = IDLE;
+		goto_state(IDLE);
         break;
 
     case WILL_LOAD_PILL:
         WillLoadPillMessage message = event.message.will_load_pill_message;
-		printf("\nHERE: %s\n", message.pill_to_load.pill_key);
         if(!prepare_to_load_pill(message.pill_to_load)){
             return FAILED;
         }
