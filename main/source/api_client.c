@@ -230,6 +230,23 @@ void post_device_pill(int position, Pill * pill){
 	xQueueSend(api_queue, &message, 0);
 }
 
+void put_device_pill_state(char * device_pill_key, DevicePillState state){
+    char * key_copy = malloc(sizeof(char) * 37);
+    strcpy(key_copy, device_pill_key);
+
+    ApiMessage message = {
+        .endpoint = PUT_DEVICE_PILL_STATUS,
+        .post_data = {
+            .put_device_pill_state_data = {
+                .device_pill_key = key_copy,
+                .state = state
+            }
+        }
+    };
+
+    xQueueSend(api_queue, &message, 0);
+}
+
 esp_err_t on_put_device_ip(PutDeviceIpData * post_data, esp_http_client_handle_t * client){
 	char request_body[MAX_POST_DATA_SIZE] = "";
 	sprintf(request_body, "{\"deviceIp\":\"%s\"}", post_data->device_ip);

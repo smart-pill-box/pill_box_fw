@@ -14,7 +14,7 @@ typedef struct PostDevicePillData {
 } PostDevicePillData;
 
 typedef struct PutDevicePillStateData {
-	char * pill_key;
+	char * device_pill_key;
 	DevicePillState state;
 } PutDevicePillStateData;
 

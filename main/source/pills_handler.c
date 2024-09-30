@@ -64,10 +64,13 @@ bool take_next_pill(){
 		printf("\n CARROUCEL NOT PREPARED TO MOVE \n");
 		return false;
 	}
+    Pill next_pill = get_next_pill();
 
 	int wanted_position = backward(get_end());
 	pop_end();
 	carroucel_to_pos_acw(wanted_position);
+
+    put_device_pill_state(next_pill.pill_key, PILL_BOX_CONFIRMED);
 
 	return true;
 }
