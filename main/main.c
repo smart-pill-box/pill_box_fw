@@ -10,6 +10,7 @@
 
 #include "esp_netif_ip_addr.h"
 #include "freertos/portmacro.h"
+#include "freertos/projdefs.h"
 #include "loaded_pills_stack.h"
 #include "alarm.h"
 #include "constants.h"
@@ -19,6 +20,8 @@
 #include "carroucel.h"
 #include "api_client.h"
 #include "constants.h"
+
+#include "esp_adc/adc_oneshot.h"
 
 #define TAG "main.c"
 #define POTENTIOMETER_PIN 36
@@ -70,8 +73,10 @@ void app_main(void)
         .proof_of_possession = "pop",
         .service_name = "MY_BOX"
     };
+
 	add_custom_endpoint("custom-data", test_handler);
-    start_wifi_manager_task(config, false);
+
+    start_wifi_manager_task(config, true);
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &on_received_new_ip, NULL));
 
     int* positions_calibrations_p = malloc(sizeof(int)*NUN_OF_POSITIONS);
@@ -92,15 +97,16 @@ void app_main(void)
 	alarm_init(23);
     start_pill_box_task();
 
-
     bool started = false;
     while (1) {
         if(get_connection_status() == 1 && !started){
             started = true;
             start_webserver();
         }
-		printf("End: %d \n Start: %d \n", get_end(), get_start());
-		vTaskDelay(1000 / portTICK_PERIOD_MS);
+		vTaskDelay(10000 / portTICK_PERIOD_MS);
+        if(get_connection_status()) {
+            put_device_pooling();
+        }
     }
 
 }

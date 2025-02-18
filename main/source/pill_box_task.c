@@ -144,10 +144,8 @@ void pill_time_state(){
 		return;
     }
 
-	printf("\n Time late %d, after proccess: %d\n", time_late, (time_late % ALARM_RETRY_EVERY_SEC));
     if(!is_playing && ((time_late % ALARM_RETRY_EVERY_SEC) < ALARM_DURATION_SEC)){
         is_playing = true;
-		printf("\n\n\n\n\n RING ALARM \n\n\n\n\n");
         alarm_ring();
     } else if (is_playing && ((time_late % ALARM_RETRY_EVERY_SEC) > ALARM_DURATION_SEC)){
         is_playing = false;

@@ -8,15 +8,15 @@ typedef struct PutDeviceIpData {
 	char * device_ip;
 } PutDeviceIpData;
 
-typedef struct PostDevicePillData {
-	int position;
-	Pill * pill;
-} PostDevicePillData;
-
 typedef struct PutDevicePillStateData {
 	char * device_pill_key;
 	DevicePillState state;
 } PutDevicePillStateData;
+
+typedef struct PostDevicePillData {
+	int position;
+	Pill * pill;
+} PostDevicePillData;
 
 typedef struct PostData {
 	union {
@@ -28,6 +28,7 @@ typedef struct PostData {
 
 typedef enum ApiEndpoint {
 	PUT_DEVICE_IP,
+	PUT_DEVICE_POOLING,
 	POST_DEVICE_PILL,
 	PUT_DEVICE_PILL_STATUS,
 } ApiEndpoint;
@@ -37,5 +38,6 @@ void init_api_client_task();
 int api_make_request(ApiEndpoint endpoint, PostData data);
 
 void put_device_ip(char device_ip[]);
+void put_device_pooling();
 void post_device_pill(int position, Pill * pill);
 void put_device_pill_state(char * pill_key, DevicePillState state);

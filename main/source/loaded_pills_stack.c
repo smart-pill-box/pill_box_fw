@@ -1,12 +1,18 @@
 #include "loaded_pills_stack.h"
+#include <stdio.h>
 
 LoadedPillsCircleStack _pills_stack;
 
 void create_pills_stack(int stack_size){
+    printf("\n\n 999");
     _pills_stack.stack_size = stack_size;
+    printf("\n\n 999");
     _pills_stack.pills = malloc(sizeof(Pill) * stack_size);
+    printf("\n\n 999");
     _pills_stack.start = 0;
+    printf("\n\n 999");
     _pills_stack.end = 0;
+    printf("\n\n 999");
 }
 
 /* Measured in the ACW direction */

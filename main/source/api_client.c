@@ -17,7 +17,7 @@
 #include "lwip/err.h"
 
 #define TAG "api_client"
-#define MEDICINE_API_HOST "192.168.0.17"
+#define MEDICINE_API_HOST "192.168.15.9"
 #define MEDICINE_API_PORT 8080
 #define MAX_PATH_SIZE 100
 #define MAX_HTTP_OUTPUT_BUFFER 1024
@@ -38,6 +38,7 @@ char local_response_buffer[MAX_HTTP_OUTPUT_BUFFER] = {0};
 esp_err_t on_put_device_ip(PutDeviceIpData * post_data, esp_http_client_handle_t * client);
 esp_err_t on_post_device_pill(PostDevicePillData * post_data, esp_http_client_handle_t * client);
 esp_err_t on_put_device_pill_state(PutDevicePillStateData * put_data, esp_http_client_handle_t * client);
+esp_err_t on_put_device_pooling(esp_http_client_handle_t * client);
 
 esp_err_t _http_event_handler(esp_http_client_event_t *evt)
 {
@@ -132,8 +133,11 @@ void map_endpoint_to_path(ApiMessage * message, char path[]){
 			sprintf(path, "/device/%s/device_pill", DEVICE_KEY);
 			break;
 		case PUT_DEVICE_PILL_STATUS:
-			sprintf(path, "/device/%s/device_pill/%s/status", DEVICE_KEY, message->post_data.put_device_pill_state_data.pill_key);
-			free(message->post_data.put_device_pill_state_data.pill_key);
+			sprintf(path, "/device/%s/device_pill/%s/status", DEVICE_KEY, message->post_data.put_device_pill_state_data.device_pill_key);
+			free(message->post_data.put_device_pill_state_data.device_pill_key);
+			break;
+		case PUT_DEVICE_POOLING:
+			sprintf(path, "/device/%s/pooling", DEVICE_KEY);
 			break;
 	}
 }
@@ -169,6 +173,10 @@ void api_task(){
 				break;
 			case PUT_DEVICE_PILL_STATUS:
 				err = on_put_device_pill_state(&message.post_data.put_device_pill_state_data, &client);
+				break;
+			case PUT_DEVICE_POOLING:
+				err = on_put_device_pooling(&client);
+				break;
 		}
 
 		if (err == ESP_OK) {
@@ -209,6 +217,13 @@ void put_device_ip(char device_ip[]){
 	xQueueSend(api_queue, &message, 0);
 }
 
+void put_device_pooling(){
+	ApiMessage message = {
+		.endpoint = PUT_DEVICE_POOLING,
+	};
+	xQueueSend(api_queue, &message, 0);
+}
+
 void post_device_pill(int position, Pill * pill){
 	Pill * pill_copy = malloc(sizeof(Pill));
 	char * pill_key_copy = malloc(sizeof(char) * 37);
@@ -229,6 +244,8 @@ void post_device_pill(int position, Pill * pill){
 	};
 	xQueueSend(api_queue, &message, 0);
 }
+
+
 
 void put_device_pill_state(char * device_pill_key, DevicePillState state){
     char * key_copy = malloc(sizeof(char) * 37);
@@ -319,6 +336,15 @@ esp_err_t on_put_device_pill_state(PutDevicePillStateData * put_data, esp_http_c
 	esp_http_client_set_header(*client, "Content-Type", "application/json");
 	esp_http_client_set_header(*client, "Content-Length", content_length);
 	esp_http_client_set_post_field(*client, request_body, strlen(request_body));
+
+	return esp_http_client_perform(*client);
+}
+
+esp_err_t on_put_device_pooling(esp_http_client_handle_t * client){
+	esp_http_client_set_method(*client, HTTP_METHOD_PUT);
+	esp_http_client_set_header(*client, "Content-Type", "application/json");
+	esp_http_client_set_header(*client, "Content-Length", "2");
+	esp_http_client_set_post_field(*client, "{}", 2);
 
 	return esp_http_client_perform(*client);
 }

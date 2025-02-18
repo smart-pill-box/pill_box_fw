@@ -212,7 +212,9 @@ static void wifi_manager_task(){
         if (provisioned){
             printf("I'M ALREADY PROVISIONED");
             ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+            printf("I'M ALREADY PROVISIONED");
             ESP_ERROR_CHECK(esp_wifi_start());
+            printf("I'M ALREADY PROVISIONED");
 
             uint16_t retries = 0;
             while(1){
@@ -241,7 +243,9 @@ static void wifi_manager_task(){
         } else {
             printf("I'm not provisioned\n");
             ESP_ERROR_CHECK(wifi_prov_mgr_init(prov_config));
+            printf("I'm not provisioned\n");
             start_provisioning();
+            
 
             printf("Waiting connection...\n");
             wait_wifi_connection();
@@ -300,7 +304,7 @@ void start_wifi_manager_task(wifi_manager_config_t config, bool restart_nvm_wifi
         ESP_ERROR_CHECK(wifi_prov_mgr_reset_provisioning());
     }
 
-    xTaskCreate(wifi_manager_task, "wifi_manager_task", 4086, (void *) &config, 10, NULL);
+    xTaskCreate(wifi_manager_task, "wifi_manager_task", 10240, (void *) &config, 10, NULL);
 }
 
 bool get_connection_status(){
